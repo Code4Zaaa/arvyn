@@ -7,11 +7,11 @@ local HttpService = game:GetService("HttpService")
 local CACHE_DIR = "Arvyn Scripts/Cache"
 
 local function GenerateKey(str)
-    local n = #str
-    string.gsub(str, ".", function(c)
-        n += c:byte() + #str
-    end)
-    return tostring(math.round(n + 15))
+    local hash = 5381
+    for i = 1, #str do
+        hash = ((hash * 33) + string.byte(str, i)) % 2^32
+    end
+    return tostring(hash)
 end
 
 local function Request(url)
