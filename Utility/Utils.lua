@@ -243,4 +243,19 @@ function Utils.GetNearestEnemy(LocalPlayer, mobsList, range, isValidTarget)
     return nearest
 end
 
+function Utils.CreateToggleLoop(maid, loopId, interval, conditionCallback, logicCallback)
+    maid:Cleanup(loopId)
+    if not conditionCallback() then return end
+    
+    maid:AddTask(task.spawn(function()
+        while task.wait(interval) do
+            if not conditionCallback() then break end
+            local success, err = pcall(logicCallback)
+            if not success then
+                warn("[Arvyn] Error in loop " .. loopId .. ": " .. tostring(err))
+            end
+        end
+    end), loopId)
+end
+
 return Utils
