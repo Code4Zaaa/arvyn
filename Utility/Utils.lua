@@ -167,7 +167,9 @@ function Utils.EnableNoClip(Maid, LocalPlayer, boolean, getState)
     end
 end
 
-function Utils.ToggleAntiKnockback(Maid, LocalPlayer, state)
+function Utils.ToggleAntiKnockback(Maid, LocalPlayer, state, getState)
+    Maid:Cleanup("AKB_ChildAdded")
+    Maid:Cleanup("AKB_CharAdded")
     Maid:Cleanup("AntiKnockback")
     if not state then return end
     
@@ -176,6 +178,7 @@ function Utils.ToggleAntiKnockback(Maid, LocalPlayer, state)
         local root = character:WaitForChild("HumanoidRootPart", 10)
         if root then
             Maid:AddTask(root.ChildAdded:Connect(function(child)
+                if getState and not getState() then return end
                 if child:IsA("BodyVelocity") and child.MaxForce == Vector3.new(40000, 40000, 40000) then
                     child:Destroy()
                 end
@@ -191,6 +194,53 @@ function Utils.ToggleAntiGameplayPaused(GuiService, state)
     pcall(function()
         GuiService:SetGameplayPausedNotificationEnabled(not state)
     end)
+end
+
+function Utils.MiniTween(TweenService, LocalPlayer, targetCFrame, activeTween, currentDest, speed)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil, nil end
+    
+    local targetPos = targetCFrame.Position
+    if activeTween and activeTween.PlaybackState == Enum.PlaybackState.Playing then
+        if currentDest and (currentDest.Position - targetPos).Magnitude < 3 then
+            return activeTween, currentDest
+        end
+    end
+
+    local distance = (root.Position - targetPos).Magnitude
+    speed = speed or 150
+    local tweenInfo = TweenInfo.new(distance / speed, Enum.EasingStyle.Linear)
+    
+    if activeTween then activeTween:Cancel() end
+    
+    local newTween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
+    newTween:Play()
+    
+    return newTween, targetCFrame
+end
+
+function Utils.GetNearestEnemy(LocalPlayer, mobsList, range, isValidTarget)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local nearest = nil
+    local minDist = range or 1/0
+    
+    local mobs = typeof(mobsList) == "Instance" and mobsList:GetChildren() or mobsList
+    for _, npc in pairs(mobs) do
+        if npc:IsA("Model") and (not isValidTarget or isValidTarget(npc)) then
+            local npcPos = npc:GetPivot().Position
+            local dist = (root.Position - npcPos).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearest = npc
+            end
+        end
+    end
+    
+    return nearest
 end
 
 return Utils
