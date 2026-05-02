@@ -99,7 +99,7 @@ function Utils.SetAutoExecute(v)
     end
 end
 
-function Utils.EnableNoClip(Maid, LocalPlayer, boolean)
+function Utils.EnableNoClip(Maid, LocalPlayer, boolean, getState)
     if boolean then
         local function apply(char)
             if not char then return end
@@ -141,8 +141,7 @@ function Utils.EnableNoClip(Maid, LocalPlayer, boolean)
 
         Maid:AddTask(LocalPlayer.CharacterAdded:Connect(function(char)
             task.wait(1)
-            -- We cannot easily check self.NoClipEnabled here if we don't store it globally or pass it,
-            -- But since it's re-applied on respawn, it's ok if the loop manages it
+            if getState and not getState() then return end
             apply(char)
         end), "NoClipRespawn")
     else
