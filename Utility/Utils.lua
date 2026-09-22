@@ -92,9 +92,9 @@ function Utils.ToggleBlackScreen(RunService, LocalPlayer, v)
     end
 end
 
-function Utils.SetAutoExecute(v)
+function Utils.SetAutoExecute(v, id)
     if v and queue_on_teleport then
-        local source = getgenv().ArvynSource or [[loadstring(game:HttpGet("https://api.arvynscripts.cloud/api/files/loader.lua"))()]]
+        local source = getgenv().ArvynSource or (id and string.format([[loadstring(game:HttpGet("https://api.arvynscripts.cloud/api/scripts/%s.lua"))()]], id)) or [[loadstring(game:HttpGet("https://api.arvynscripts.cloud/api/files/loader.lua"))()]]
         queue_on_teleport(source)
     end
 end
@@ -243,8 +243,8 @@ function Utils.GetNearestEnemy(LocalPlayer, mobsList, range, isValidTarget)
     return nearest
 end
 
-function Utils.CreateToggleLoop(maid, loopId, interval, conditionCallback, logicCallback)
-    maid:Cleanup(loopId)
+function Utils.RegisterProcess(maid, processId, interval, conditionCallback, logicCallback)
+    maid:Cleanup(processId)
     if not conditionCallback() then return end
     
     maid:AddTask(task.spawn(function()
@@ -252,10 +252,10 @@ function Utils.CreateToggleLoop(maid, loopId, interval, conditionCallback, logic
             if not conditionCallback() then break end
             local success, err = pcall(logicCallback)
             if not success then
-                warn("[Arvyn] Error in loop " .. loopId .. ": " .. tostring(err))
+                warn("[Arvyn] Error in process " .. processId .. ": " .. tostring(err))
             end
         end
-    end), loopId)
+    end), processId)
 end
 
 return Utils
