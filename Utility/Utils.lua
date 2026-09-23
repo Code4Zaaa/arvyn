@@ -245,14 +245,14 @@ end
 
 function Utils.RegisterProcess(maid, processId, interval, conditionCallback, logicCallback)
     maid:Cleanup(processId)
-    if not conditionCallback() then return end
     
     maid:AddTask(task.spawn(function()
         while task.wait(interval) do
-            if not conditionCallback() then break end
-            local success, err = pcall(logicCallback)
-            if not success then
-                warn("[Arvyn] Error in process " .. processId .. ": " .. tostring(err))
+            if conditionCallback() then
+                local success, err = pcall(logicCallback)
+                if not success then
+                    warn("Error in process " .. processId .. ": " .. tostring(err))
+                end
             end
         end
     end), processId)
