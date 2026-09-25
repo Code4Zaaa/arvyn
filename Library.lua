@@ -155,6 +155,7 @@ Library.BuiltInRegular = Font.new('rbxasset://LuaPackages/Packages/_Index/Builde
 Library.BuiltInBold = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Bold,Enum.FontStyle.Normal);
 Library.GlobalSignals = {};
 Library.UnloadEnabled = false;
+Library.IsPremium = false;
 
 local cloneref: cloneref = cloneref or function(f) return f end;
 local TweenService: TweenService = cloneref(game:GetService('TweenService'));
@@ -5117,7 +5118,8 @@ function Library:CreateWindow(Config)
 		Config = Library:ProcessParams(Config , {
 			Icon = "crosshairs",
 			Name = "Tab",
-			Type = "Double"
+			Type = "Double",
+			Premium = false
 		});
 
 		local Tab = {
@@ -5192,6 +5194,141 @@ function Library:CreateWindow(Config)
 		TabFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 		TabFrame.Size = UDim2.new(1, 0, 1, 0)
 		TabFrame.Visible = true;
+
+		-- Coming Soon placeholder (shown when tab has no sections)
+		local ComingSoonFrame = Instance.new("Frame")
+		local ComingSoonIcon = Instance.new("TextLabel")
+		local ComingSoonLabel = Instance.new("TextLabel")
+		local ComingSoonSub = Instance.new("TextLabel")
+
+		ComingSoonFrame.Name = Library.RandomString()
+		ComingSoonFrame.Parent = TabFrame
+		ComingSoonFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+		ComingSoonFrame.BackgroundTransparency = 1
+		ComingSoonFrame.BorderSizePixel = 0
+		ComingSoonFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+		ComingSoonFrame.Size = UDim2.new(0, 250, 0, 120)
+		ComingSoonFrame.ZIndex = 15
+
+		ComingSoonIcon.Name = Library.RandomString()
+		ComingSoonIcon.Parent = ComingSoonFrame
+		ComingSoonIcon.AnchorPoint = Vector2.new(0.5, 0)
+		ComingSoonIcon.BackgroundTransparency = 1
+		ComingSoonIcon.BorderSizePixel = 0
+		ComingSoonIcon.Position = UDim2.new(0.5, 0, 0, 0)
+		ComingSoonIcon.Size = UDim2.new(0, 40, 0, 40)
+		ComingSoonIcon.ZIndex = 16
+		ComingSoonIcon.FontFace = Library.BuiltInBold
+		ComingSoonIcon.Text = "clock-dashed"
+		ComingSoonIcon.TextColor3 = Library.AccentColor
+		ComingSoonIcon.TextSize = 32
+		ComingSoonIcon.TextTransparency = 0.350
+
+		ComingSoonLabel.Name = Library.RandomString()
+		ComingSoonLabel.Parent = ComingSoonFrame
+		ComingSoonLabel.AnchorPoint = Vector2.new(0.5, 0)
+		ComingSoonLabel.BackgroundTransparency = 1
+		ComingSoonLabel.BorderSizePixel = 0
+		ComingSoonLabel.Position = UDim2.new(0.5, 0, 0, 50)
+		ComingSoonLabel.Size = UDim2.new(1, 0, 0, 25)
+		ComingSoonLabel.ZIndex = 16
+		ComingSoonLabel.Font = Enum.Font.GothamBold
+		ComingSoonLabel.Text = "Coming Soon"
+		ComingSoonLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		ComingSoonLabel.TextSize = 18
+		ComingSoonLabel.TextTransparency = 0.200
+
+		ComingSoonSub.Name = Library.RandomString()
+		ComingSoonSub.Parent = ComingSoonFrame
+		ComingSoonSub.AnchorPoint = Vector2.new(0.5, 0)
+		ComingSoonSub.BackgroundTransparency = 1
+		ComingSoonSub.BorderSizePixel = 0
+		ComingSoonSub.Position = UDim2.new(0.5, 0, 0, 78)
+		ComingSoonSub.Size = UDim2.new(1, 0, 0, 20)
+		ComingSoonSub.ZIndex = 16
+		ComingSoonSub.Font = Enum.Font.GothamMedium
+		ComingSoonSub.Text = "This tab is under development."
+		ComingSoonSub.TextColor3 = Color3.fromRGB(255, 255, 255)
+		ComingSoonSub.TextSize = 12
+		ComingSoonSub.TextTransparency = 0.550
+
+		Tab._sectionCount = 0
+		Tab._comingSoonFrame = ComingSoonFrame
+
+		-- Premium overlay (shown when tab is premium and user is not premium)
+		local PremiumOverlay = Instance.new("Frame")
+		local PremiumIcon = Instance.new("TextLabel")
+		local PremiumLabel = Instance.new("TextLabel")
+		local PremiumSub = Instance.new("TextLabel")
+
+		PremiumOverlay.Name = Library.RandomString()
+		PremiumOverlay.Parent = TabFrame
+		PremiumOverlay.AnchorPoint = Vector2.new(0.5, 0.5)
+		PremiumOverlay.BackgroundColor3 = Color3.fromRGB(8, 8, 13)
+		PremiumOverlay.BackgroundTransparency = 0.150
+		PremiumOverlay.BorderSizePixel = 0
+		PremiumOverlay.Position = UDim2.new(0.5, 0, 0.5, 0)
+		PremiumOverlay.Size = UDim2.new(1, 0, 1, 0)
+		PremiumOverlay.ZIndex = 50
+		PremiumOverlay.Visible = false
+
+		PremiumIcon.Name = Library.RandomString()
+		PremiumIcon.Parent = PremiumOverlay
+		PremiumIcon.AnchorPoint = Vector2.new(0.5, 0)
+		PremiumIcon.BackgroundTransparency = 1
+		PremiumIcon.BorderSizePixel = 0
+		PremiumIcon.Position = UDim2.new(0.5, 0, 0.35, 0)
+		PremiumIcon.Size = UDim2.new(0, 45, 0, 45)
+		PremiumIcon.ZIndex = 51
+		PremiumIcon.FontFace = Library.BuiltInBold
+		PremiumIcon.Text = "lock-closed"
+		PremiumIcon.TextColor3 = Color3.fromRGB(255, 200, 60)
+		PremiumIcon.TextSize = 36
+		PremiumIcon.TextTransparency = 0.150
+
+		PremiumLabel.Name = Library.RandomString()
+		PremiumLabel.Parent = PremiumOverlay
+		PremiumLabel.AnchorPoint = Vector2.new(0.5, 0)
+		PremiumLabel.BackgroundTransparency = 1
+		PremiumLabel.BorderSizePixel = 0
+		PremiumLabel.Position = UDim2.new(0.5, 0, 0.35, 55)
+		PremiumLabel.Size = UDim2.new(1, 0, 0, 25)
+		PremiumLabel.ZIndex = 51
+		PremiumLabel.Font = Enum.Font.GothamBold
+		PremiumLabel.Text = "Premium Only"
+		PremiumLabel.TextColor3 = Color3.fromRGB(255, 200, 60)
+		PremiumLabel.TextSize = 18
+		PremiumLabel.TextTransparency = 0.100
+
+		PremiumSub.Name = Library.RandomString()
+		PremiumSub.Parent = PremiumOverlay
+		PremiumSub.AnchorPoint = Vector2.new(0.5, 0)
+		PremiumSub.BackgroundTransparency = 1
+		PremiumSub.BorderSizePixel = 0
+		PremiumSub.Position = UDim2.new(0.5, 0, 0.35, 82)
+		PremiumSub.Size = UDim2.new(1, 0, 0, 20)
+		PremiumSub.ZIndex = 51
+		PremiumSub.Font = Enum.Font.GothamMedium
+		PremiumSub.Text = "Upgrade to access this feature."
+		PremiumSub.TextColor3 = Color3.fromRGB(255, 255, 255)
+		PremiumSub.TextSize = 12
+		PremiumSub.TextTransparency = 0.550
+
+		Tab._premiumOverlay = PremiumOverlay
+		Tab._isPremiumTab = Config.Premium
+
+		local function UpdateTabOverlays()
+			if Config.Premium and not Library.IsPremium then
+				PremiumOverlay.Visible = true
+				ComingSoonFrame.Visible = false
+			else
+				PremiumOverlay.Visible = false
+				ComingSoonFrame.Visible = (Tab._sectionCount == 0)
+			end
+		end
+
+		UpdateTabOverlays()
+
 
 		LeftScroll.Name = Library.RandomString();
 		LeftScroll.Parent = TabFrame
@@ -5361,8 +5498,18 @@ function Library:CreateWindow(Config)
 		function Tab:AddSection(Config)
 			Config = Library:ProcessParams(Config , {
 				Name = "SECTION",
-				Position = 'left'
+				Position = 'left',
+				Premium = false
 			});
+
+			-- Hide Coming Soon when a section is added
+			Tab._sectionCount = (Tab._sectionCount or 0) + 1
+			if Tab._comingSoonFrame then
+				Tab._comingSoonFrame.Visible = false
+			end
+
+			-- Premium section: if section is premium and user is not, show locked placeholder instead
+			local IsSectionLocked = (Config.Premium and not Library.IsPremium)
 
 			local SectionFrame = Instance.new("Frame")
 			local SectionLabel = Instance.new("TextLabel")
@@ -5437,6 +5584,57 @@ function Library:CreateWindow(Config)
 
 			local Section = Library:RegisiterItem(SectionHandler , Tab.Signal);
 
+			-- Premium lock overlay for individual sections
+			local SectionPremiumOverlay
+			if IsSectionLocked then
+				SectionPremiumOverlay = Instance.new("Frame")
+				local SPLock = Instance.new("TextLabel")
+				local SPLabel = Instance.new("TextLabel")
+
+				SectionPremiumOverlay.Name = Library.RandomString()
+				SectionPremiumOverlay.Parent = SectionHandler
+				SectionPremiumOverlay.AnchorPoint = Vector2.new(0.5, 0.5)
+				SectionPremiumOverlay.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+				SectionPremiumOverlay.BackgroundTransparency = 0.200
+				SectionPremiumOverlay.BorderSizePixel = 0
+				SectionPremiumOverlay.Position = UDim2.new(0.5, 0, 0.5, 0)
+				SectionPremiumOverlay.Size = UDim2.new(1, 0, 1, 0)
+				SectionPremiumOverlay.ZIndex = 30
+
+				local SPCorner = Instance.new("UICorner")
+				SPCorner.CornerRadius = UDim.new(0, 10)
+				SPCorner.Parent = SectionPremiumOverlay
+
+				SPLock.Name = Library.RandomString()
+				SPLock.Parent = SectionPremiumOverlay
+				SPLock.AnchorPoint = Vector2.new(0.5, 0.5)
+				SPLock.BackgroundTransparency = 1
+				SPLock.BorderSizePixel = 0
+				SPLock.Position = UDim2.new(0.5, -45, 0.5, 0)
+				SPLock.Size = UDim2.new(0, 22, 0, 22)
+				SPLock.ZIndex = 31
+				SPLock.FontFace = Library.BuiltInBold
+				SPLock.Text = "lock-closed"
+				SPLock.TextColor3 = Color3.fromRGB(255, 200, 60)
+				SPLock.TextSize = 18
+				SPLock.TextTransparency = 0.200
+
+				SPLabel.Name = Library.RandomString()
+				SPLabel.Parent = SectionPremiumOverlay
+				SPLabel.AnchorPoint = Vector2.new(0, 0.5)
+				SPLabel.BackgroundTransparency = 1
+				SPLabel.BorderSizePixel = 0
+				SPLabel.Position = UDim2.new(0.5, -25, 0.5, 0)
+				SPLabel.Size = UDim2.new(0, 100, 0, 20)
+				SPLabel.ZIndex = 31
+				SPLabel.Font = Enum.Font.GothamBold
+				SPLabel.Text = "Premium"
+				SPLabel.TextColor3 = Color3.fromRGB(255, 200, 60)
+				SPLabel.TextSize = 14
+				SPLabel.TextTransparency = 0.200
+				SPLabel.TextXAlignment = Enum.TextXAlignment.Left
+			end
+
 			Section.SetRender = LPH_NO_VIRTUALIZE(function(value)
 				if value then
 					Library.PlayAnimate(SectionLabel,SlowyTween,{
@@ -5467,6 +5665,9 @@ function Library:CreateWindow(Config)
 
 			Section.SetRender(Tab.Signal:GetValue());
 			Tab.Signal:Connect(Section.SetRender);
+
+			Section._isPremium = Config.Premium
+			Section._premiumOverlay = SectionPremiumOverlay
 
 			return Section;
 		end;
