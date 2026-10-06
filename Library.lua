@@ -922,9 +922,6 @@ function Library:GetIconFont(icon: string)
 	return Library.BuiltInRegular;
 end;
 
-	return Library.BuiltInRegular;
-end;
-
 function Library:MoreThanHalfY(Value: number)
 	return (Library.ScreenGui.AbsoluteSize.Y / 2) < Value
 end;
