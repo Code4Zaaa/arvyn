@@ -151,8 +151,32 @@ isfile = isfile or getgenv().isfile;
 
 local Library = {};
 
-Library.BuiltInRegular = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Regular,Enum.FontStyle.Normal);
-Library.BuiltInBold = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Bold,Enum.FontStyle.Normal);
+local LucideSuccess, Lucide = pcall(function()
+	local IconFetchSuccess, IconModuleSource = pcall(request, {
+		Url = "https://raw.githubusercontent.com/notpoiu/lucide-roblox-direct/refs/heads/main/source.lua",
+		Method = "GET",
+	})
+
+	assert(
+		IconFetchSuccess and IconModuleSource.Success
+			or IconModuleSource.StatusCode >= 200 and IconModuleSource.StatusCode < 300,
+		"Failed to fetch lucide icons direct module source"
+	)
+	return (loadstring(IconModuleSource.Body))()
+end)
+
+local LucideFont: Font? = nil
+if LucideSuccess and typeof(Lucide.GetFontAsset) == "function" then
+	pcall(function()
+		local FontIcon = Lucide.GetFontAsset("circle-alert")
+		if FontIcon then
+			LucideFont = FontIcon.FontFace
+		end
+	end)
+end
+
+Library.BuiltInRegular = LucideFont or Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Regular,Enum.FontStyle.Normal);
+Library.BuiltInBold = LucideFont or Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Bold,Enum.FontStyle.Normal);
 Library.GlobalSignals = {};
 Library.UnloadEnabled = false;
 Library.IsPremium = false;
