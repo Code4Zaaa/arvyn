@@ -165,18 +165,18 @@ local LucideSuccess, Lucide = pcall(function()
 	return (loadstring(IconModuleSource.Body))()
 end)
 
-local LucideFont: Font? = nil
+Library.LucideFont = nil
 if LucideSuccess and typeof(Lucide.GetFontAsset) == "function" then
 	pcall(function()
 		local FontIcon = Lucide.GetFontAsset("circle-alert")
 		if FontIcon then
-			LucideFont = FontIcon.FontFace
+			Library.LucideFont = FontIcon.FontFace
 		end
 	end)
 end
 
-Library.BuiltInRegular = LucideFont or Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Regular,Enum.FontStyle.Normal);
-Library.BuiltInBold = LucideFont or Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Bold,Enum.FontStyle.Normal);
+Library.BuiltInRegular = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Regular,Enum.FontStyle.Normal);
+Library.BuiltInBold = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Bold,Enum.FontStyle.Normal);
 Library.GlobalSignals = {};
 Library.UnloadEnabled = false;
 Library.IsPremium = false;
@@ -895,23 +895,32 @@ Library.CreateSignal = LPH_NO_VIRTUALIZE(function(self , DefaultValue)
 end);
 
 Library.SetIconMode = LPH_NO_VIRTUALIZE(function(self , Label: TextLabel , Icon: string)
+	local useLucide = string.match(Icon, "%-lucide$")
+	if useLucide then
+		Icon = string.gsub(Icon, "%-lucide$", "")
+	end
+
 	local useBold = string.lower(string.sub(Icon , -5)) == '-bold';
 
 	if useBold then
 		Label.Text = Icon:sub(1,-6);
-		Label.FontFace = Library.BuiltInBold;
+		Label.FontFace = useLucide and Library.LucideFont or Library.BuiltInBold;
 	else
 		Label.Text = Icon;
-		Label.FontFace = Library.BuiltInRegular;
+		Label.FontFace = useLucide and Library.LucideFont or Library.BuiltInRegular;
 	end;
 end);
 
 function Library:GetIconFont(icon: string)
-	local useBold = string.lower(string.sub(icon , -5)) == '-bold';
+	local useLucide = string.match(icon, "%-lucide$")
+	if useLucide then return Library.LucideFont end
 
+	local useBold = string.lower(string.sub(icon , -5)) == '-bold';
 	if useBold then
 		return Library.BuiltInBold;
 	end;
+	return Library.BuiltInRegular;
+end;
 
 	return Library.BuiltInRegular;
 end;
@@ -2419,8 +2428,7 @@ function Library:RegisiterHandler(Handler: Frame , Signal)
 		Icon.Position = UDim2.new(0.5, 0, 0.5, 0)
 		Icon.Size = UDim2.new(1, 0, 1, 0)
 		Icon.ZIndex = ZINdex + 14
-		Icon.FontFace = Library.BuiltInBold
-		Icon.Text = (GearIcon == 1 and 'gear') or (GearIcon == 2 and 'chevron-large-right') or "three-dots-horizontal";
+		Library:SetIconMode(Icon, (GearIcon == 1 and 'gear') or (GearIcon == 2 and 'chevron-large-right') or "three-dots-horizontal");
 		Icon.TextColor3 = Color3.fromRGB(223, 223, 223)
 		Icon.TextSize = 16.000
 		Icon.TextTransparency = 0.400
@@ -2924,8 +2932,7 @@ function Library:RegisiterHandler(Handler: Frame , Signal)
 		DropdownIcon.Position = UDim2.new(1, -2, 0.5, 0)
 		DropdownIcon.Size = UDim2.new(0, 18, 0, 18)
 		DropdownIcon.ZIndex = ZINdex + 14
-		DropdownIcon.FontFace = Library.BuiltInBold
-		DropdownIcon.Text = "chevron-small-down"
+		Library:SetIconMode(DropdownIcon, "chevron-small-down");
 		DropdownIcon.TextColor3 = Color3.fromRGB(223, 223, 223)
 		DropdownIcon.TextSize = 16
 		DropdownIcon.TextTransparency = 0.250
@@ -3268,8 +3275,7 @@ function Library:RegisiterHandler(Handler: Frame , Signal)
 					Icon.Position = UDim2.new(0, 5, 0.5, 0)
 					Icon.Size = UDim2.new(0, 20, 0, 20)
 					Icon.ZIndex = ZINdex + 1259
-					Icon.FontFace = Library.BuiltInBold
-					Icon.Text = "check"
+					Library:SetIconMode(Icon, "check");
 					Icon.TextColor3 = Color3.fromRGB(223, 223, 223)
 					Icon.TextSize = 18
 					Icon.TextTransparency = 1
@@ -3978,8 +3984,7 @@ function Library:RegisiterItem(Frame: Frame , Signel)
 		Icon.Position = UDim2.new(0, 11, 0, 5)
 		Icon.Size = UDim2.new(0, 18, 0, 18)
 		Icon.ZIndex = LayerIndex + 9
-		Icon.FontFace = Library.BuiltInBold
-		Icon.Text = Config.Icon
+		Library:SetIconMode(Icon, Config.Icon);
 		Icon.TextColor3 = Color3.fromRGB(223, 223, 223)
 		Icon.TextSize = 16.000
 		Icon.TextTransparency = 0.250
@@ -4751,8 +4756,7 @@ function Library:CreateWindow(Config)
 	UserSettingButton.Position = UDim2.new(1, -7, 0.5, 0)
 	UserSettingButton.Size = UDim2.new(0, 25, 0, 25)
 	UserSettingButton.ZIndex = 7
-	UserSettingButton.FontFace = Library.BuiltInBold
-	UserSettingButton.Text = "chevron-large-right"
+	Library:SetIconMode(UserSettingButton, "chevron-large-right");
 	UserSettingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 	UserSettingButton.TextSize = 13.000
 	UserSettingButton.TextTransparency = 0.5
@@ -4835,8 +4839,7 @@ function Library:CreateWindow(Config)
 	ConfigIcon.Position = UDim2.new(0, 2, 0.5, 0)
 	ConfigIcon.Size = UDim2.new(0, 25, 0, 25)
 	ConfigIcon.ZIndex = 9
-	ConfigIcon.FontFace = Library.BuiltInBold
-	ConfigIcon.Text = "pencil-square"
+	Library:SetIconMode(ConfigIcon, "pencil-square");
 	ConfigIcon.TextColor3 = Color3.fromRGB(223, 223, 223)
 	ConfigIcon.TextSize = 16.000
 	ConfigIcon.TextTransparency = 0.250
@@ -4878,8 +4881,7 @@ function Library:CreateWindow(Config)
 	ConfigBthIcon.Position = UDim2.new(1, -2, 0.5, 0)
 	ConfigBthIcon.Size = UDim2.new(0, 25, 0, 25)
 	ConfigBthIcon.ZIndex = 9
-	ConfigBthIcon.FontFace = Library.BuiltInBold
-	ConfigBthIcon.Text = "chevron-small-down"
+	Library:SetIconMode(ConfigBthIcon, "chevron-small-down");
 	ConfigBthIcon.TextColor3 = Color3.fromRGB(223, 223, 223)
 	ConfigBthIcon.TextSize = 16.000
 	ConfigBthIcon.TextTransparency = 0.250
@@ -4907,8 +4909,7 @@ function Library:CreateWindow(Config)
 	SearchIcon.Position = UDim2.new(0, 2, 0.5, 0)
 	SearchIcon.Size = UDim2.new(0, 25, 0, 25)
 	SearchIcon.ZIndex = 12
-	SearchIcon.FontFace = Library.BuiltInBold
-	SearchIcon.Text = "magnifying-glass"
+	Library:SetIconMode(SearchIcon, "magnifying-glass");
 	SearchIcon.TextColor3 = Color3.fromRGB(223, 223, 223)
 	SearchIcon.TextSize = 14.000
 	SearchIcon.TextTransparency = 0.45
@@ -5179,8 +5180,7 @@ function Library:CreateWindow(Config)
 		TabIcon.Position = UDim2.new(0, 2, 0.5, 0)
 		TabIcon.Size = UDim2.new(0, 25, 0, 25)
 		TabIcon.ZIndex = 9
-		TabIcon.FontFace = Library.BuiltInBold
-		TabIcon.Text = Config.Icon;
+		Library:SetIconMode(TabIcon, Config.Icon);
 		TabIcon.TextColor3 = Library.AccentColor
 		TabIcon.TextSize = 16.000
 		TabIcon.TextWrapped = true
@@ -5242,8 +5242,7 @@ function Library:CreateWindow(Config)
 		ComingSoonIcon.Position = UDim2.new(0.5, 0, 0, 0)
 		ComingSoonIcon.Size = UDim2.new(0, 40, 0, 40)
 		ComingSoonIcon.ZIndex = 16
-		ComingSoonIcon.FontFace = Library.BuiltInBold
-		ComingSoonIcon.Text = "clock-dashed"
+		Library:SetIconMode(ComingSoonIcon, "clock-dashed");
 		ComingSoonIcon.TextColor3 = Library.AccentColor
 		ComingSoonIcon.TextSize = 32
 		ComingSoonIcon.TextTransparency = 0.350
@@ -5304,8 +5303,7 @@ function Library:CreateWindow(Config)
 		PremiumIcon.Position = UDim2.new(0.5, 0, 0.35, 0)
 		PremiumIcon.Size = UDim2.new(0, 45, 0, 45)
 		PremiumIcon.ZIndex = 51
-		PremiumIcon.FontFace = Library.BuiltInBold
-		PremiumIcon.Text = "lock-closed"
+		Library:SetIconMode(PremiumIcon, "lock-closed");
 		PremiumIcon.TextColor3 = Color3.fromRGB(255, 200, 60)
 		PremiumIcon.TextSize = 36
 		PremiumIcon.TextTransparency = 0.150
@@ -5637,8 +5635,7 @@ function Library:CreateWindow(Config)
 				SPLock.Position = UDim2.new(0.5, -45, 0.5, 0)
 				SPLock.Size = UDim2.new(0, 22, 0, 22)
 				SPLock.ZIndex = 31
-				SPLock.FontFace = Library.BuiltInBold
-				SPLock.Text = "lock-closed"
+				Library:SetIconMode(SPLock, "lock-closed");
 				SPLock.TextColor3 = Color3.fromRGB(255, 200, 60)
 				SPLock.TextSize = 18
 				SPLock.TextTransparency = 0.200
@@ -5927,8 +5924,7 @@ function Library:CreateWindow(Config)
 		CopyIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
 		CopyIcon.Size = UDim2.new(1, 0, 1, 0)
 		CopyIcon.ZIndex = 154
-		CopyIcon.FontFace = Library.BuiltInBold
-		CopyIcon.Text = "memory-card"
+		Library:SetIconMode(CopyIcon, "memory-card");
 		CopyIcon.TextColor3 = Color3.fromRGB(223, 223, 223)
 		CopyIcon.TextSize = 16
 		CopyIcon.TextTransparency = 0.350
@@ -6046,8 +6042,7 @@ function Library:CreateWindow(Config)
 		ImportIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
 		ImportIcon.Size = UDim2.new(1, 0, 1, 0)
 		ImportIcon.ZIndex = 154
-		ImportIcon.FontFace = Library.BuiltInBold
-		ImportIcon.Text = "check"
+		Library:SetIconMode(ImportIcon, "check");
 		ImportIcon.TextColor3 = Color3.fromRGB(223, 223, 223)
 		ImportIcon.TextSize = 16
 		ImportIcon.TextTransparency = 0.350
@@ -6168,8 +6163,7 @@ function Library:CreateWindow(Config)
 		Icon.Position = UDim2.new(0.5, 0, 0.5, 0)
 		Icon.Size = UDim2.new(1, 0, 1, 0)
 		Icon.ZIndex = 153
-		Icon.FontFace = Library.BuiltInBold
-		Icon.Text = "plus-large"
+		Library:SetIconMode(Icon, "plus-large");
 		Icon.TextColor3 = Color3.fromRGB(223, 223, 223)
 		Icon.TextSize = 16.000
 		Icon.TextTransparency = 0.350
@@ -6354,8 +6348,7 @@ function Library:CreateWindow(Config)
 				Icon.Position = UDim2.new(0.5, 0, 0.5, 0)
 				Icon.Size = UDim2.new(1, 0, 1, 0)
 				Icon.ZIndex = 153
-				Icon.FontFace = Library.BuiltInBold
-				Icon.Text = "trash-can"
+				Library:SetIconMode(Icon, "trash-can");
 				Icon.TextColor3 = Color3.fromRGB(223, 223, 223)
 				Icon.TextSize = 16.000
 				Icon.TextTransparency = 0.400
@@ -6384,8 +6377,7 @@ function Library:CreateWindow(Config)
 				Icon_2.Position = UDim2.new(0.5, 0, 0.5, 0)
 				Icon_2.Size = UDim2.new(1, 0, 1, 0)
 				Icon_2.ZIndex = 153
-				Icon_2.FontFace = Library.BuiltInBold
-				Icon_2.Text = "arrow-right-from-portrait-rectangle"
+				Library:SetIconMode(Icon_2, "arrow-right-from-portrait-rectangle");
 				Icon_2.TextColor3 = Color3.fromRGB(223, 223, 223)
 				Icon_2.TextSize = 16.000
 				Icon_2.TextTransparency = 0.400
@@ -6962,8 +6954,7 @@ function Library:CreateWindow(Config)
 			Icon.Position = UDim2.new(0, 10, 0.5, 0)
 			Icon.Size = UDim2.new(0, 20, 0, 20)
 			Icon.ZIndex = 17
-			Icon.FontFace = Library.BuiltInBold;
-			Icon.Text = IconStr
+			Library:SetIconMode(Icon, IconStr);
 			Icon.TextColor3 = Library.AccentColor
 			Icon.TextSize = 18.000
 			Icon.TextTransparency = 0.250
@@ -7372,8 +7363,7 @@ function Library:CreateLogger()
 		Icon.Position = UDim2.new(0, 7, 0, 3)
 		Icon.Size = UDim2.new(0, 15, 0, 15)
 		Icon.ZIndex = 133
-		Icon.FontFace = Library.BuiltInBold
-		Icon.Text = IconStr
+		Library:SetIconMode(Icon, IconStr);
 		Icon.TextColor3 = Color3.fromRGB(223, 223, 223)
 		Icon.TextSize = 13.000
 		Icon.TextTransparency = 1--0.250
@@ -7539,8 +7529,7 @@ function Library:CreateIndicator()
 		Icon.Position = UDim2.new(0, 10, 0.5, 0)
 		Icon.Size = UDim2.new(0, 25, 0, 25)
 		Icon.ZIndex = 17
-		Icon.FontFace = Library.BuiltInBold;
-		Icon.Text = Config.Icon
+		Library:SetIconMode(Icon, Config.Icon);
 		Icon.TextColor3 = Color3.fromRGB(186, 186, 186)
 		Icon.TextSize = 21.000
 		Icon.TextTransparency = 1
@@ -7659,3 +7648,4 @@ function Library:Unload()
 end;
 
 return Library;
+
