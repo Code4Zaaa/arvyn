@@ -902,13 +902,8 @@ Library.SetIconMode = LPH_NO_VIRTUALIZE(function(self , Label: TextLabel , Icon:
 
 	local useBold = string.lower(string.sub(Icon , -5)) == '-bold';
 
-	if useBold then
-		Label.Text = Icon:sub(1,-6);
-		Label.FontFace = useLucide and Library.LucideFont or Library.BuiltInBold;
-	else
-		Label.Text = Icon;
-		Label.FontFace = useLucide and Library.LucideFont or Library.BuiltInRegular;
-	end;
+	Label.Text = Icon;
+	Label.FontFace = useLucide and Library.LucideFont or Library.BuiltInRegular;
 end);
 
 function Library:GetIconFont(icon: string)
