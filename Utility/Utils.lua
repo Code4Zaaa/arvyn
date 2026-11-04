@@ -245,14 +245,19 @@ end
 
 function Utils.RegisterProcess(maid, processId, interval, conditionCallback, logicCallback)
     maid:Cleanup(processId)
-    
+
+    local function step()
+        local passed = conditionCallback()
+        if logicCallback and passed then
+            logicCallback()
+        end
+    end
+
     maid:AddTask(task.spawn(function()
         while task.wait(interval) do
-            if conditionCallback() then
-                local success, err = pcall(logicCallback)
-                if not success then
-                    warn("Error in process " .. processId .. ": " .. tostring(err))
-                end
+            local success, err = pcall(step)
+            if not success then
+                warn("Error in process " .. processId .. ": " .. tostring(err))
             end
         end
     end), processId)

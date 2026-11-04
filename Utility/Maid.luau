@@ -144,21 +144,26 @@ end
 function Maid:Cleanup(feature)
     if feature then
         assert(type(feature) == "string" or type(feature) == "number", "Feature must be a string or number")
-        for _, task in ipairs(self._features[feature] or {}) do
+        local featureTasks = self._features[feature]
+        if not featureTasks then
+            return
+        end
+        self._features[feature] = nil
+
+        for _, task in ipairs(featureTasks) do
+            local index = table.find(self._tasks, task)
+            if index then
+                table.remove(self._tasks, index)
+            end
+
+            index = table.find(self._threads, task)
+            if index then
+                table.remove(self._threads, index)
+            end
+
             self:_cleanupTask(task)
         end
-        self._features[feature] = {}
-        
-        for i = #self._tasks, 1, -1 do
-            local task = self._tasks[i]
-            for _, featureTask in ipairs(self._features[feature] or {}) do
-                if task == featureTask then
-                    table.remove(self._tasks, i)
-                    break
-                end
-            end
-        end
-        
+
         return
     end
     
