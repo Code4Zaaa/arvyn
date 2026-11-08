@@ -243,24 +243,77 @@ function Utils.GetNearestEnemy(LocalPlayer, mobsList, range, isValidTarget)
     return nearest
 end
 
-function Utils.RegisterProcess(maid, processId, interval, conditionCallback, logicCallback)
-    maid:Cleanup(processId)
+Utils.Processes = {}
 
-    local function step()
-        local passed = conditionCallback()
-        if logicCallback and passed then
-            logicCallback()
+function Utils.StopProcess(processId)
+    local proc = Utils.Processes[processId]
+    if proc then
+        proc.Stopped = true
+        if proc.Thread and coroutine.status(proc.Thread) ~= "dead" then
+            pcall(coroutine.close, proc.Thread)
+        end
+        Utils.Processes[processId] = nil
+    end
+end
+
+function Utils.StopAllProcesses()
+    for id, proc in pairs(Utils.Processes) do
+        proc.Stopped = true
+        if proc.Thread and coroutine.status(proc.Thread) ~= "dead" then
+            pcall(coroutine.close, proc.Thread)
         end
     end
+    table.clear(Utils.Processes)
+end
 
-    maid:AddTask(task.spawn(function()
-        while task.wait(interval) do
-            local success, err = pcall(step)
-            if not success then
-                warn("Error in process " .. processId .. ": " .. tostring(err))
+function Utils.RegisterProcess(maid, processId, interval, conditionCallback, logicCallback)
+    if not processId then return end
+
+    Utils.StopProcess(processId)
+    if maid and type(maid.Cleanup) == "function" then
+        pcall(maid.Cleanup, maid, processId)
+    end
+
+    local isCondAndLogic = (logicCallback ~= nil)
+    local proc = {
+        Id = processId,
+        Stopped = false,
+        Thread = nil,
+    }
+    Utils.Processes[processId] = proc
+
+    local thread = task.spawn(function()
+        while not proc.Stopped and task.wait(interval) do
+            if proc.Stopped then break end
+            local env = (getgenv and getgenv()) or _G
+            if env and env.Modules and env.Modules.Unloaded then
+                proc.Stopped = true
+                break
+            end
+
+            local success, err = pcall(function()
+                if isCondAndLogic then
+                    local passed = conditionCallback()
+                    if passed and logicCallback and not proc.Stopped then
+                        logicCallback()
+                    end
+                else
+                    conditionCallback()
+                end
+            end)
+            if not success and proc.Stopped then
+                break
             end
         end
-    end), processId)
+    end)
+
+    proc.Thread = thread
+
+    if maid and type(maid.AddTask) == "function" then
+        maid:AddTask(thread, processId)
+    end
+
+    return thread
 end
 
 return Utils
