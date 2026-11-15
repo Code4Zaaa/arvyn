@@ -116,8 +116,6 @@ function ServerReporter.new(options)
 	local self = setmetatable({}, ServerReporter)
 	self.Url = options.Url:gsub("/+$", "")
 	self.Id = options.Id
-	-- Sign(timestamp, body) -> hex signature. Preferred: the secret then never reaches this
-	-- (public) module. Without it, Secret + Hash are used.
 	self.SignFn = options.Sign
 	local secret = options.Secret
 	self.Interval = options.Interval or 15
@@ -135,20 +133,11 @@ function ServerReporter.new(options)
 	self.Enabled = true
 	self.Events = {}
 	self.EventsByKey = {}
-	-- Last batch sent: Sig = sorted "event=item" list, At = os.clock() of the send,
-	-- Wait = seconds until the next heartbeat, Fails = consecutive failures.
 	self.State = { Sig = "", At = -math.huge, Wait = 0, Fails = 0 }
 	self.Joining = false
 	return self
 end
 
--- ---------------------------------------------------------------------------
--- Events
--- ---------------------------------------------------------------------------
-
--- event = { Key = "boss", Name = "Boss", MaxAge = 10, Check = function() ... end, Items = {...} }
--- Key goes into the URL (lowercase letters / digits). MaxAge (minutes) is how old a
--- report may be when looking for servers. Items is optional, for UI filters only.
 function ServerReporter:AddEvent(event)
 	assert(type(event) == "table" and type(event.Key) == "string" and type(event.Check) == "function",
 		"ServerReporter:AddEvent: { Key = string, Check = function } expected")
@@ -191,12 +180,6 @@ function ServerReporter:ReadEvent(event)
 	return true, { type(result) == "string" and result or "" }
 end
 
--- ---------------------------------------------------------------------------
--- HTTP
--- ---------------------------------------------------------------------------
-
--- Signed request: X-Signature = sha256(timestamp .. body .. secret).
--- Returns (ok, decodedBody, statusCode); ok only for 2xx.
 function ServerReporter:Request(method, path, payload)
 	if not self.RequestFn then return false, nil, 0 end
 	local body = payload ~= nil and HttpService:JSONEncode(payload) or ""
@@ -223,11 +206,6 @@ function ServerReporter:Request(method, path, payload)
 	return status >= 200 and status < 300, data, status
 end
 
--- ---------------------------------------------------------------------------
--- Reporting
--- ---------------------------------------------------------------------------
-
--- Sends the full live list of this server in one request. `events` = { [key] = { items } }.
 function ServerReporter:SendBatch(events)
 	return self:Request("POST", "/spawns/batch", {
 		place_id = game.PlaceId,
@@ -238,9 +216,6 @@ function ServerReporter:SendBatch(events)
 	})
 end
 
--- One reporter step: checks every detector and sends a batch only when the live set
--- changed or the heartbeat is due. Failures back off instead of retrying every step.
--- Pass force = true to send now regardless of timers.
 function ServerReporter:Step(force)
 	local events, parts = {}, {}
 	if self.Enabled then
@@ -255,7 +230,6 @@ function ServerReporter:Step(force)
 	table.sort(parts)
 	local sig = table.concat(parts, "|")
 	local state = self.State
-	-- Nothing live and nothing reported: no request at all.
 	if sig == "" and state.Sig == "" then return false end
 	if not force then
 		local elapsed = os.clock() - state.At
@@ -276,13 +250,11 @@ function ServerReporter:Step(force)
 	return ok
 end
 
--- Removes this server from every list (e.g. before leaving or when sharing is turned off).
 function ServerReporter:Clear()
 	self.State.Sig = ""
 	return self:SendBatch({})
 end
 
--- Turning sharing off clears this server's reports on the next step.
 function ServerReporter:SetEnabled(enabled)
 	self.Enabled = enabled ~= false
 end
@@ -307,20 +279,11 @@ function ServerReporter:Stop()
 	end
 end
 
--- Stops the loop and removes this server's reports.
 function ServerReporter:Destroy()
 	self:Stop()
 	if self.State.Sig ~= "" then task.spawn(self.Clear, self) end
 end
 
--- ---------------------------------------------------------------------------
--- Finding servers
--- ---------------------------------------------------------------------------
-
--- Servers reported for `key` (optionally only `item`), newest first, without the current
--- server and ones reported as full. opts: { MaxAge = minutes, Item = string,
--- PlaceId = number (default: this place), AnyPlace = true to skip the place filter }.
--- Returns the list, or nil + status code when the API can't be reached.
 function ServerReporter:GetServers(key, opts)
 	opts = opts or {}
 	local event = self.EventsByKey[key:lower()]
@@ -343,9 +306,6 @@ function ServerReporter:GetServers(key, opts)
 	return servers
 end
 
--- Every live report (all events) for a table. Rows keep the raw API entry plus display
--- fields: Event, Item, Players, PlayerCount, Age (seconds), Job, Current, Highlight.
--- opts: { MaxAge, PlaceId, AnyPlace } like GetServers. nil + status when unreachable.
 function ServerReporter:ListServers(opts)
 	if type(opts) == "number" then opts = { MaxAge = opts } end
 	opts = opts or {}
@@ -377,10 +337,6 @@ function ServerReporter:ListServers(opts)
 	return rows
 end
 
--- ---------------------------------------------------------------------------
--- Joining
--- ---------------------------------------------------------------------------
-
 function ServerReporter:Notify(title, text, kind)
 	if self.OnNotify then pcall(self.OnNotify, title, text, kind or "Info") end
 end
@@ -390,8 +346,6 @@ function ServerReporter:Teleport(entry)
 	TeleportService:TeleportToPlaceInstance(tonumber(entry.place_id) or game.PlaceId, entry.job_id, Players.LocalPlayer)
 end
 
--- Tries the servers in order until one teleport goes through; a failed or stalled
--- teleport moves on to the next one. Runs in the background.
 function ServerReporter:JoinServerList(servers, label)
 	label = label or "event"
 	if self.Joining then
@@ -431,8 +385,6 @@ function ServerReporter:JoinServerList(servers, label)
 	end)
 end
 
--- Joins a server where `key` is live (and has `item`, if given). Does nothing when the
--- event is already live here.
 function ServerReporter:JoinEvent(key, item, label)
 	local event = self.EventsByKey[key:lower()]
 	label = label or (event and event.Name) or key
