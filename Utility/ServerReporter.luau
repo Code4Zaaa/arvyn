@@ -166,7 +166,6 @@ function ServerReporter:RemoveEvent(key)
 	end
 end
 
--- (live, items) for one event; items is a list of item names ("" = no item).
 function ServerReporter:ReadEvent(event)
 	local ok, result = pcall(event.Check)
 	if not ok or not result then return false, {} end
