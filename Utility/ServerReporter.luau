@@ -1,48 +1,3 @@
---[[
-	ServerReporter: universal "which server has which event" reporter for the Arvyn API.
-
-	Every client checks a list of events (detectors) on its own server and sends ONE
-	signed batch request with everything that is live. The backend replaces whatever
-	this server reported before, so ended events disappear without despawn calls.
-	Any client can then list those servers and teleport into one.
-
-	Usage:
-		local ServerReporter = loadstring(game:HttpGet(".../ServerReporter.luau"))()
-		local Reporter = ServerReporter.new({
-			Url = "https://server.example.com/api/v1/mygame", -- API base for this game
-			Id = "my_hub",
-			Secret = "sec_...",
-		})
-		Reporter:AddEvent({ Key = "boss", Name = "Boss", MaxAge = 10, Check = function()
-			-- false/nil = not live, true = live, "Name" = live with an item,
-			-- { "A", "B" } = live with several items (one row each)
-			return workspace.Enemies:FindFirstChild("Big Boss") and "Big Boss" or false
-		end })
-		Reporter:Start()
-
-		-- Somewhere in the UI:
-		Reporter:JoinEvent("boss", "Big Boss")       -- join the newest server with it
-		local rows = Reporter:ListServers(10)          -- every live report (for a table)
-
-	Options for ServerReporter.new (all optional except Url / Id / Secret):
-		Interval   = 15      seconds between detector checks
-		Heartbeat  = 90      seconds between re-sends while nothing changed
-		Jitter     = 30      extra random seconds added to each heartbeat
-		MaxBackoff = 300     longest wait after failed sends (30, 60, 120 ... seconds)
-		Teleport   = function(entry) ... end
-		           How to join a server. Default: TeleportService:TeleportToPlaceInstance.
-		           Some games block client teleports and need their own remote.
-		JoinTimeout = 8      seconds to wait for a teleport before trying the next server
-		OnNotify   = function(title, text, kind) end   ("Info" / "Success" / "Warning" / "Error")
-		Sign       = function(timestamp, body) -> hex string
-		           Signs requests itself, so Secret can be left out and never reaches this
-		           module. Recommended: define it in your obfuscated script with your own copy
-		           of Sha256 (see below): sha256(timestamp .. body .. secret).
-		Hash       = sha256 function(string) -> hex, used with Secret when Sign is not given
-		           (default: executor crypt.hash, else the pure Luau ServerReporter.Sha256)
-		Request    = custom http request function (default: executor request)
-]]
-
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
@@ -113,8 +68,6 @@ function ServerReporter.new(options)
 	local self = setmetatable({}, ServerReporter)
 	self.Url = options.Url:gsub("/+$", "")
 	self.Id = options.Id
-	-- Sign(timestamp, body) -> hex signature. Preferred: the secret then never reaches this
-	-- (public) module. Without it, Secret + Hash are used.
 	self.SignFn = options.Sign
 	local secret = options.Secret
 	self.Interval = options.Interval or 15
@@ -132,23 +85,11 @@ function ServerReporter.new(options)
 	self.Enabled = true
 	self.Events = {}
 	self.EventsByKey = {}
-	-- Last batch sent: Sig = sorted "event=item" list, At = os.clock() of the send,
-	-- Wait = seconds until the next heartbeat, Fails = consecutive failures.
 	self.State = { Sig = "", At = -math.huge, Wait = 0, Fails = 0 }
 	self.Joining = false
 	return self
 end
 
--- ---------------------------------------------------------------------------
--- Events
--- ---------------------------------------------------------------------------
-
--- event = { Key = "boss", Name = "Boss", MaxAge = 10, Check = function() ... end, Items = {...} }
--- Key goes into the URL (lowercase letters / digits). MaxAge (minutes) is how old a
--- report may be when looking for servers. Items is optional, for UI filters only.
--- Witness = true marks an event this client only knows about if it saw it happen (e.g. a
--- chat announcement before it joined). A miss then proves nothing, so it never removes
--- another client's report of that event; the report expires once nobody refreshes it.
 function ServerReporter:AddEvent(event)
 	assert(type(event) == "table" and type(event.Key) == "string" and type(event.Check) == "function",
 		"ServerReporter:AddEvent: { Key = string, Check = function } expected")
@@ -177,7 +118,6 @@ function ServerReporter:RemoveEvent(key)
 	end
 end
 
--- (live, items) for one event; items is a list of item names ("" = no item).
 function ServerReporter:ReadEvent(event)
 	local ok, result = pcall(event.Check)
 	if not ok or not result then return false, {} end
@@ -191,12 +131,6 @@ function ServerReporter:ReadEvent(event)
 	return true, { type(result) == "string" and result or "" }
 end
 
--- ---------------------------------------------------------------------------
--- HTTP
--- ---------------------------------------------------------------------------
-
--- Signed request: X-Signature = sha256(timestamp .. body .. secret).
--- Returns (ok, decodedBody, statusCode); ok only for 2xx.
 function ServerReporter:Request(method, path, payload)
 	if not self.RequestFn then return false, nil, 0 end
 	local body = payload ~= nil and HttpService:JSONEncode(payload) or ""
@@ -223,13 +157,6 @@ function ServerReporter:Request(method, path, payload)
 	return status >= 200 and status < 300, data, status
 end
 
--- ---------------------------------------------------------------------------
--- Reporting
--- ---------------------------------------------------------------------------
-
--- Event keys this client can confirm are not live. The API only removes reports of these
--- keys, so other scripts in the same server (with other or fewer detectors) keep theirs.
--- includeWitness: also vouch for Witness events (used when withdrawing every report).
 function ServerReporter:CheckedKeys(includeWitness)
 	local keys = {}
 	for _, event in ipairs(self.Events) do
@@ -238,22 +165,17 @@ function ServerReporter:CheckedKeys(includeWitness)
 	return keys
 end
 
--- Sends the full live list of this server in one request. `events` = { [key] = { items } };
--- `checked` = keys whose missing reports may be removed (default: CheckedKeys()).
 function ServerReporter:SendBatch(events, checked)
 	return self:Request("POST", "/spawns/batch", {
 		place_id = game.PlaceId,
 		job_id = game.JobId,
 		player_count = #Players:GetPlayers(),
 		max_players = Players.MaxPlayers,
-		events = next(events) and events or nil, -- an empty table would encode as [] (not an object)
-		checked = checked or self:CheckedKeys(), -- [] is fine here: it is a list
+		events = next(events) and events or nil,
+		checked = checked or self:CheckedKeys(),
 	})
 end
 
--- One reporter step: checks every detector and sends a batch only when the live set
--- changed or the heartbeat is due. Failures back off instead of retrying every step.
--- Pass force = true to send now regardless of timers.
 function ServerReporter:Step(force)
 	local events, parts = {}, {}
 	if self.Enabled then
@@ -268,7 +190,6 @@ function ServerReporter:Step(force)
 	table.sort(parts)
 	local sig = table.concat(parts, "|")
 	local state = self.State
-	-- Nothing live and nothing reported: no request at all.
 	if sig == "" and state.Sig == "" then return false end
 	if not force then
 		local elapsed = os.clock() - state.At
@@ -279,7 +200,6 @@ function ServerReporter:Step(force)
 		end
 	end
 	state.At = os.clock()
-	-- Sharing turned off: withdraw everything, Witness events included.
 	local ok = self:SendBatch(events, not self.Enabled and self:CheckedKeys(true) or nil)
 	if ok then
 		state.Sig, state.Fails = sig, 0
@@ -290,13 +210,11 @@ function ServerReporter:Step(force)
 	return ok
 end
 
--- Removes this server from every list (e.g. before leaving or when sharing is turned off).
 function ServerReporter:Clear()
 	self.State.Sig = ""
 	return self:SendBatch({}, self:CheckedKeys(true))
 end
 
--- Turning sharing off clears this server's reports on the next step.
 function ServerReporter:SetEnabled(enabled)
 	self.Enabled = enabled ~= false
 end
@@ -304,7 +222,6 @@ end
 function ServerReporter:Start()
 	if self.Thread then return end
 	self.Thread = task.spawn(function()
-		-- Random first delay so clients that load at the same time don't send together.
 		task.wait(math.random() * 5)
 		while self.Thread do
 			pcall(self.Step, self)
@@ -321,20 +238,11 @@ function ServerReporter:Stop()
 	end
 end
 
--- Stops the loop and removes this server's reports.
 function ServerReporter:Destroy()
 	self:Stop()
 	if self.State.Sig ~= "" then task.spawn(self.Clear, self) end
 end
 
--- ---------------------------------------------------------------------------
--- Finding servers
--- ---------------------------------------------------------------------------
-
--- Servers reported for `key` (optionally only `item`), newest first, without the current
--- server and ones reported as full. opts: { MaxAge = minutes, Item = string,
--- PlaceId = number (default: this place), AnyPlace = true to skip the place filter }.
--- Returns the list, or nil + status code when the API can't be reached.
 function ServerReporter:GetServers(key, opts)
 	opts = opts or {}
 	local event = self.EventsByKey[key:lower()]
@@ -357,9 +265,6 @@ function ServerReporter:GetServers(key, opts)
 	return servers
 end
 
--- Every live report (all events) for a table. Rows keep the raw API entry plus display
--- fields: Event, Item, Players, PlayerCount, Age (seconds), Job, Current, Highlight.
--- opts: { MaxAge, PlaceId, AnyPlace } like GetServers. nil + status when unreachable.
 function ServerReporter:ListServers(opts)
 	if type(opts) == "number" then opts = { MaxAge = opts } end
 	opts = opts or {}
@@ -384,16 +289,12 @@ function ServerReporter:ListServers(opts)
 				Age = seenAt > 0 and math.max(now - seenAt, 0) or nil,
 				Job = entry.job_id:sub(1, 8),
 				Current = entry.job_id == game.JobId,
-				Highlight = entry.job_id == game.JobId, -- row highlight in table UIs
+				Highlight = entry.job_id == game.JobId,
 			})
 		end
 	end
 	return rows
 end
-
--- ---------------------------------------------------------------------------
--- Joining
--- ---------------------------------------------------------------------------
 
 function ServerReporter:Notify(title, text, kind)
 	if self.OnNotify then pcall(self.OnNotify, title, text, kind or "Info") end
@@ -404,8 +305,6 @@ function ServerReporter:Teleport(entry)
 	TeleportService:TeleportToPlaceInstance(tonumber(entry.place_id) or game.PlaceId, entry.job_id, Players.LocalPlayer)
 end
 
--- Tries the servers in order until one teleport goes through; a failed or stalled
--- teleport moves on to the next one. Runs in the background.
 function ServerReporter:JoinServerList(servers, label)
 	label = label or "event"
 	if self.Joining then
@@ -445,8 +344,6 @@ function ServerReporter:JoinServerList(servers, label)
 	end)
 end
 
--- Joins a server where `key` is live (and has `item`, if given). Does nothing when the
--- event is already live here.
 function ServerReporter:JoinEvent(key, item, label)
 	local event = self.EventsByKey[key:lower()]
 	label = label or (event and event.Name) or key
