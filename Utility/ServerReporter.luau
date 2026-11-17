@@ -6,9 +6,6 @@
 	this server reported before, so ended events disappear without despawn calls.
 	Any client can then list those servers and teleport into one.
 
-	No secrets live in this file: the game script passes its own API url / id and either a
-	Secret or (better) a Sign function that keeps the secret inside the obfuscated script.
-
 	Usage:
 		local ServerReporter = loadstring(game:HttpGet(".../ServerReporter.luau"))()
 		local Reporter = ServerReporter.new({
@@ -149,6 +146,9 @@ end
 -- event = { Key = "boss", Name = "Boss", MaxAge = 10, Check = function() ... end, Items = {...} }
 -- Key goes into the URL (lowercase letters / digits). MaxAge (minutes) is how old a
 -- report may be when looking for servers. Items is optional, for UI filters only.
+-- Witness = true marks an event this client only knows about if it saw it happen (e.g. a
+-- chat announcement before it joined). A miss then proves nothing, so it never removes
+-- another client's report of that event; the report expires once nobody refreshes it.
 function ServerReporter:AddEvent(event)
 	assert(type(event) == "table" and type(event.Key) == "string" and type(event.Check) == "function",
 		"ServerReporter:AddEvent: { Key = string, Check = function } expected")
@@ -227,14 +227,27 @@ end
 -- Reporting
 -- ---------------------------------------------------------------------------
 
--- Sends the full live list of this server in one request. `events` = { [key] = { items } }.
-function ServerReporter:SendBatch(events)
+-- Event keys this client can confirm are not live. The API only removes reports of these
+-- keys, so other scripts in the same server (with other or fewer detectors) keep theirs.
+-- includeWitness: also vouch for Witness events (used when withdrawing every report).
+function ServerReporter:CheckedKeys(includeWitness)
+	local keys = {}
+	for _, event in ipairs(self.Events) do
+		if includeWitness or not event.Witness then table.insert(keys, event.Key) end
+	end
+	return keys
+end
+
+-- Sends the full live list of this server in one request. `events` = { [key] = { items } };
+-- `checked` = keys whose missing reports may be removed (default: CheckedKeys()).
+function ServerReporter:SendBatch(events, checked)
 	return self:Request("POST", "/spawns/batch", {
 		place_id = game.PlaceId,
 		job_id = game.JobId,
 		player_count = #Players:GetPlayers(),
 		max_players = Players.MaxPlayers,
 		events = next(events) and events or nil, -- an empty table would encode as [] (not an object)
+		checked = checked or self:CheckedKeys(), -- [] is fine here: it is a list
 	})
 end
 
@@ -266,7 +279,8 @@ function ServerReporter:Step(force)
 		end
 	end
 	state.At = os.clock()
-	local ok = self:SendBatch(events)
+	-- Sharing turned off: withdraw everything, Witness events included.
+	local ok = self:SendBatch(events, not self.Enabled and self:CheckedKeys(true) or nil)
 	if ok then
 		state.Sig, state.Fails = sig, 0
 		state.Wait = self.Heartbeat + math.random() * self.Jitter
@@ -279,7 +293,7 @@ end
 -- Removes this server from every list (e.g. before leaving or when sharing is turned off).
 function ServerReporter:Clear()
 	self.State.Sig = ""
-	return self:SendBatch({})
+	return self:SendBatch({}, self:CheckedKeys(true))
 end
 
 -- Turning sharing off clears this server's reports on the next step.
