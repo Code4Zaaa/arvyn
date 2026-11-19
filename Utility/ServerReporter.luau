@@ -176,13 +176,7 @@ function ServerReporter:SendBatch(events, checked)
 	})
 end
 
--- Private / reserved servers can't be joined by JobId, so only public servers are reported.
-local function IsPublicServer()
-	return game.PrivateServerId == "" and game.PrivateServerOwnerId == 0
-end
-
 function ServerReporter:Step(force)
-	if not IsPublicServer() then return false end
 	local events, parts = {}, {}
 	if self.Enabled then
 		for _, event in ipairs(self.Events) do
@@ -218,7 +212,6 @@ end
 
 function ServerReporter:Clear()
 	self.State.Sig = ""
-	if not IsPublicServer() then return false end
 	return self:SendBatch({}, self:CheckedKeys(true))
 end
 
