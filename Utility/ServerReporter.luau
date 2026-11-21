@@ -274,6 +274,8 @@ function ServerReporter:ListServers(opts)
 	if opts.Limit then table.insert(query, "limit=" .. tostring(math.floor(opts.Limit))) end
 	if opts.Offset and opts.Offset > 0 then table.insert(query, "offset=" .. tostring(math.floor(opts.Offset))) end
 	if opts.Item and opts.Item ~= "" then table.insert(query, "item=" .. HttpService:UrlEncode(opts.Item)) end
+	-- the API then answers { servers = [...], total = N }: N is every row matching the filters, not just this page
+	table.insert(query, "with_total=1")
 	local route = "/spawns/all"
 	if opts.EventKey and opts.EventKey ~= "" then
 		route = "/spawns/" .. tostring(opts.EventKey):lower()
@@ -282,6 +284,12 @@ function ServerReporter:ListServers(opts)
 	end
 	local ok, data, status = self:Request("GET", route .. "?" .. table.concat(query, "&"))
 	if not ok or type(data) ~= "table" then return nil, status end
+	-- an API that predates with_total still sends a bare array: total stays nil then
+	local total
+	if type(data.servers) == "table" then
+		total = tonumber(data.total)
+		data = data.servers
+	end
 	local rows, now = {}, os.time()
 	for _, entry in ipairs(data) do
 		if type(entry) == "table" and type(entry.job_id) == "string" and entry.job_id ~= "" then
@@ -303,7 +311,7 @@ function ServerReporter:ListServers(opts)
 			})
 		end
 	end
-	return rows
+	return rows, status, total
 end
 
 function ServerReporter:Notify(title, text, kind)
