@@ -270,7 +270,17 @@ function ServerReporter:ListServers(opts)
 	opts = opts or {}
 	local query = { "max_age=" .. tostring(opts.MaxAge or 10) }
 	if not opts.AnyPlace then table.insert(query, "place_id=" .. tostring(opts.PlaceId or game.PlaceId)) end
-	local ok, data, status = self:Request("GET", "/spawns/all?" .. table.concat(query, "&"))
+	-- Paging is done by the API (Limit / Offset): decoding and building thousands of rows at once froze the client.
+	if opts.Limit then table.insert(query, "limit=" .. tostring(math.floor(opts.Limit))) end
+	if opts.Offset and opts.Offset > 0 then table.insert(query, "offset=" .. tostring(math.floor(opts.Offset))) end
+	if opts.Item and opts.Item ~= "" then table.insert(query, "item=" .. HttpService:UrlEncode(opts.Item)) end
+	local route = "/spawns/all"
+	if opts.EventKey and opts.EventKey ~= "" then
+		route = "/spawns/" .. tostring(opts.EventKey):lower()
+	elseif type(opts.Exclude) == "table" and #opts.Exclude > 0 then
+		table.insert(query, "exclude=" .. HttpService:UrlEncode(table.concat(opts.Exclude, ",")))
+	end
+	local ok, data, status = self:Request("GET", route .. "?" .. table.concat(query, "&"))
 	if not ok or type(data) ~= "table" then return nil, status end
 	local rows, now = {}, os.time()
 	for _, entry in ipairs(data) do
