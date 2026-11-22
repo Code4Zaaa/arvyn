@@ -77,6 +77,9 @@ function ServerReporter.new(options)
 	self.JoinTimeout = options.JoinTimeout or 8
 	self.TeleportFn = options.Teleport
 	self.OnNotify = options.OnNotify
+	-- Discord ID linked to the player's key (LS_LinkedDiscordID), or a function returning it. Sent as X-Discord-ID on
+	-- list requests only, so the API can tell Premium from Freemium. Nothing is sent without it.
+	self.DiscordId = options.DiscordId
 	self.RequestFn = options.Request or DefaultRequest()
 	if not self.SignFn then
 		local hash = options.Hash or DefaultHash()
@@ -141,6 +144,15 @@ function ServerReporter:Request(method, path, payload)
 		["X-Signature"] = self.SignFn(timestamp, body),
 	}
 	if payload ~= nil then headers["Content-Type"] = "application/json" end
+	if method == "GET" and self.DiscordId ~= nil then
+		local id = self.DiscordId
+		if type(id) == "function" then
+			local okId, value = pcall(id)
+			id = okId and value or nil
+		end
+		id = id ~= nil and tostring(id) or ""
+		if id:match("^%d+$") then headers["X-Discord-ID"] = id end
+	end
 	local ok, response = pcall(self.RequestFn, {
 		Url = self.Url .. path,
 		Method = method,
@@ -376,7 +388,10 @@ function ServerReporter:JoinEvent(key, item, label)
 	end
 	task.spawn(function()
 		local servers, status = self:GetServers(key, { Item = item, MaxAge = event and event.MaxAge })
-		if not servers then
+		if not servers and status == 403 then
+			-- the API only lists Premium events for an account whose linked Discord owns a Premium key
+			self:Notify("Server Finder", label .. " servers are for Premium users (link your Discord to your key).", "Warning")
+		elseif not servers then
 			self:Notify("Server Finder", "Failed to reach the API (" .. tostring(status) .. ").", "Error")
 		elseif #servers == 0 then
 			self:Notify("Server Finder", "No recent " .. label .. " server found. Try again later.", "Warning")
