@@ -77,9 +77,8 @@ function ServerReporter.new(options)
 	self.JoinTimeout = options.JoinTimeout or 8
 	self.TeleportFn = options.Teleport
 	self.OnNotify = options.OnNotify
-	-- The player's script key (script_key), or a function returning it. Sent as X-Script-Key on list requests only, so
-	-- the API can tell Premium from Freemium (it checks the key with LuaSentry itself). Nothing is sent without it.
 	self.ScriptKey = options.ScriptKey
+	self.IsPrivateFn = options.IsPrivate
 	self.RequestFn = options.Request or DefaultRequest()
 	if not self.SignFn then
 		local hash = options.Hash or DefaultHash()
@@ -188,9 +187,16 @@ function ServerReporter:SendBatch(events, checked)
 	})
 end
 
+function ServerReporter:IsPrivate()
+	if not self.IsPrivateFn then return false end
+	local ok, result = pcall(self.IsPrivateFn)
+	return not ok or result == true
+end
+
 function ServerReporter:Step(force)
 	local events, parts = {}, {}
-	if self.Enabled then
+	local active = self.Enabled and not self:IsPrivate()
+	if active then
 		for _, event in ipairs(self.Events) do
 			local live, items = self:ReadEvent(event)
 			if live then
@@ -212,7 +218,7 @@ function ServerReporter:Step(force)
 		end
 	end
 	state.At = os.clock()
-	local ok = self:SendBatch(events, not self.Enabled and self:CheckedKeys(true) or nil)
+	local ok = self:SendBatch(events, not active and self:CheckedKeys(true) or nil)
 	if ok then
 		state.Sig, state.Fails = sig, 0
 		state.Wait = self.Heartbeat + math.random() * self.Jitter
@@ -223,6 +229,7 @@ function ServerReporter:Step(force)
 end
 
 function ServerReporter:Clear()
+	if self:IsPrivate() then return false end
 	self.State.Sig = ""
 	return self:SendBatch({}, self:CheckedKeys(true))
 end
@@ -282,11 +289,9 @@ function ServerReporter:ListServers(opts)
 	opts = opts or {}
 	local query = { "max_age=" .. tostring(opts.MaxAge or 10) }
 	if not opts.AnyPlace then table.insert(query, "place_id=" .. tostring(opts.PlaceId or game.PlaceId)) end
-	-- Paging is done by the API (Limit / Offset): decoding and building thousands of rows at once froze the client.
 	if opts.Limit then table.insert(query, "limit=" .. tostring(math.floor(opts.Limit))) end
 	if opts.Offset and opts.Offset > 0 then table.insert(query, "offset=" .. tostring(math.floor(opts.Offset))) end
 	if opts.Item and opts.Item ~= "" then table.insert(query, "item=" .. HttpService:UrlEncode(opts.Item)) end
-	-- the API then answers { servers = [...], total = N }: N is every row matching the filters, not just this page
 	table.insert(query, "with_total=1")
 	local route = "/spawns/all"
 	if opts.EventKey and opts.EventKey ~= "" then
@@ -296,7 +301,6 @@ function ServerReporter:ListServers(opts)
 	end
 	local ok, data, status = self:Request("GET", route .. "?" .. table.concat(query, "&"))
 	if not ok or type(data) ~= "table" then return nil, status end
-	-- an API that predates with_total still sends a bare array: total stays nil then
 	local total
 	if type(data.servers) == "table" then
 		total = tonumber(data.total)
@@ -389,7 +393,6 @@ function ServerReporter:JoinEvent(key, item, label)
 	task.spawn(function()
 		local servers, status = self:GetServers(key, { Item = item, MaxAge = event and event.MaxAge })
 		if not servers and status == 403 then
-			-- the API only lists Premium events for a Premium key
 			self:Notify("Server Finder", label .. " servers are for Premium users.", "Warning")
 		elseif not servers then
 			self:Notify("Server Finder", "Failed to reach the API (" .. tostring(status) .. ").", "Error")
