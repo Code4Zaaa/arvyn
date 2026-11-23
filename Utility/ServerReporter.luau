@@ -292,6 +292,12 @@ function ServerReporter:ListServers(opts)
 	if opts.Limit then table.insert(query, "limit=" .. tostring(math.floor(opts.Limit))) end
 	if opts.Offset and opts.Offset > 0 then table.insert(query, "offset=" .. tostring(math.floor(opts.Offset))) end
 	if opts.Item and opts.Item ~= "" then table.insert(query, "item=" .. HttpService:UrlEncode(opts.Item)) end
+	if type(opts.Search) == "string" and opts.Search ~= "" then
+		table.insert(query, "q=" .. HttpService:UrlEncode(opts.Search:sub(1, 64)))
+		if type(opts.SearchEvents) == "table" and #opts.SearchEvents > 0 then
+			table.insert(query, "q_events=" .. HttpService:UrlEncode(table.concat(opts.SearchEvents, ",")))
+		end
+	end
 	table.insert(query, "with_total=1")
 	local route = "/spawns/all"
 	if opts.EventKey and opts.EventKey ~= "" then
