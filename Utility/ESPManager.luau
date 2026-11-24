@@ -1105,6 +1105,12 @@ local FruitMeshMap = {
 	["11908375285"] = { name = "Spirit Fruit", rarity = 4, realName = "Spirit-Spirit" },
 	["101378450824208"] = { name = "Yeti Fruit", rarity = 4, realName = "Yeti-Yeti" },
 	["15106768588"] = { name = "Leopard Fruit", rarity = 4, realName = "Leopard-Leopard" },
+	["87218479448975"] = { name = "Tiger Fruit", rarity = 4, realName = "Tiger-Tiger" },
+	["99189853190350"] = { name = "Tiger Fruit", rarity = 4, realName = "Tiger-Tiger" },
+	["79394457898514"] = { name = "Tiger Fruit", rarity = 4, realName = "Tiger-Tiger" },
+	["91925899960555"] = { name = "Tiger Fruit", rarity = 4, realName = "Tiger-Tiger" },
+	["82561482973191"] = { name = "Tiger Fruit", rarity = 4, realName = "Tiger-Tiger" },
+	["77429213241575"] = { name = "Tiger Fruit", rarity = 4, realName = "Tiger-Tiger" },
 	["15482881956"] = { name = "Kitsune Fruit", rarity = 4, realName = "Kitsune-Kitsune" },
 	["19001642259"] = { name = "Dragon (East) Fruit", rarity = 4, realName = "Dragon (East)-Dragon (East)" },
 	["18955022385"] = { name = "Dragon (West) Fruit", rarity = 4, realName = "Dragon (West)-Dragon (West)" },
@@ -1202,6 +1208,10 @@ local function GetFruitSprite(realName)
 	return nil
 end
 
+-- Mesh ids learned elsewhere (the host script fills it from the Arvyn fruit dictionary: mesh id -> { name, realName,
+-- rarity }), checked after the built-in map so fruits added to the game later are still named.
+ESPManager.ExtraFruitMeshes = ESPManager.ExtraFruitMeshes or {}
+
 local function ResolveFruitInfo(fruitInstance)
 	BuildFruitCache()
 	if not fruitInstance then return "Devil Fruit", FruitRarityMeta[0], nil, nil end
@@ -1213,8 +1223,8 @@ local function ResolveFruitInfo(fruitInstance)
 		end
 		if meshId ~= "" then
 			local idOnly = meshId:match("%d+")
-			if idOnly and FruitMeshMap[idOnly] then
-				local entry = FruitMeshMap[idOnly]
+			local entry = idOnly and (FruitMeshMap[idOnly] or ESPManager.ExtraFruitMeshes[idOnly])
+			if entry then
 				local realKey = entry.realName:lower()
 				local cached = FruitCache[realKey] or FruitCache[entry.name:lower()]
 				if cached then
