@@ -1586,6 +1586,8 @@ function ESPManager:AddChest(chestInstance, options)
 	})
 end
 
+local FruitFirstSeen
+
 function ESPManager:AddFruit(fruitInstance, options)
 	if self._Destroyed or self.Settings.Enabled == false then return nil end
 	if not fruitInstance then return nil end
@@ -1608,6 +1610,19 @@ function ESPManager:AddFruit(fruitInstance, options)
 	end
 
 	local fruitName, meta, realName, fruitSprite = ResolveFruitInfo(fruitInstance)
+	-- A fruit that has just streamed in often has its Handle before its meshes, so it still reads as "Devil Fruit"
+	-- and the label would stay that way for good (the name is fixed when the ESP is made). The host retries every
+	-- tick, so hold the ESP back for a few seconds until the meshes are there; after that show it as it is.
+	if fruitName == "Devil Fruit" then
+		FruitFirstSeen = FruitFirstSeen or setmetatable({}, { __mode = "k" })
+		local first = FruitFirstSeen[fruitInstance]
+		if not first then
+			FruitFirstSeen[fruitInstance] = os.clock()
+			return nil
+		elseif os.clock() - first < 4 then
+			return nil
+		end
+	end
 	local color = options.Color or meta.Color
 
 	local tileSprite = InventoryRarityTiles[meta.Rarity] or InventoryRarityTiles[0]
