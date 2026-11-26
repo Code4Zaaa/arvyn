@@ -345,16 +345,29 @@ function ServerReporter:Teleport(entry)
 	TeleportService:TeleportToPlaceInstance(tonumber(entry.place_id) or game.PlaceId, entry.job_id, Players.LocalPlayer)
 end
 
+-- Stops a running join for good. Call it when the teleport starts: some executors keep the Lua state alive into the
+-- next server, and the join thread waking up there (its timeout fires ~8s after the teleport) touched objects of the
+-- destroyed place (game, GuiService, the TeleportInitFailed connection), which force closed the client.
+function ServerReporter:CancelJoin()
+	self.Leaving = true
+	for _, thread in ipairs({ self.JoinThread, self.JoinTimer }) do
+		if thread and thread ~= coroutine.running() and coroutine.status(thread) ~= "dead" then
+			pcall(task.cancel, thread)
+		end
+	end
+	self.JoinThread, self.JoinTimer = nil, nil
+end
+
 function ServerReporter:JoinServerList(servers, label)
 	label = label or "event"
 	if self.Joining then
 		return self:Notify("Server Finder", "Already joining a server...", "Warning")
 	end
 	self.Joining = true
-	task.spawn(function()
+	self.JoinThread = task.spawn(function()
 		local startJob = game.JobId
 		for i, entry in ipairs(servers) do
-			if game.JobId ~= startJob then break end
+			if self.Leaving or game.JobId ~= startJob then break end
 			self:Notify("Server Finder", string.format("Joining %s server (%d/%d)...", label, i, #servers))
 			pcall(GuiService.ClearError, GuiService)
 			local failed, done = false, false
@@ -371,14 +384,16 @@ function ServerReporter:JoinServerList(servers, label)
 				local ok = pcall(self.Teleport, self, entry)
 				if not ok then failed = true resume() end
 			end)
-			task.delay(self.JoinTimeout, resume)
+			self.JoinTimer = task.delay(self.JoinTimeout, resume)
 			coroutine.yield()
+			if self.Leaving then return end
 			conn:Disconnect()
 			pcall(GuiService.ClearError, GuiService)
 			if failed then task.wait(1) end
 		end
 		self.Joining = false
-		if game.JobId == startJob then
+		self.JoinThread, self.JoinTimer = nil, nil
+		if not self.Leaving and game.JobId == startJob then
 			self:Notify("Server Finder", "All " .. label .. " servers were full or unavailable.", "Warning")
 		end
 	end)
