@@ -6,6 +6,16 @@ local GuiService = game:GetService("GuiService")
 local ServerReporter = {}
 ServerReporter.__index = ServerReporter
 
+-- Unix time from the Roblox server's clock, not the device's. The API refuses a request whose X-Timestamp is more
+-- than 60s off its own clock (replay protection), so a phone with a wrong clock got 401 on every request and the
+-- Server Finder only said "Failed to reach Arvyn API" (reported). The ages in the list use it too.
+local function Now()
+	local ok, t = pcall(function() return workspace:GetServerTimeNow() end)
+	if ok and type(t) == "number" and t > 1e9 then return math.floor(t) end
+	return os.time()
+end
+ServerReporter.Now = Now
+
 local function Sha256(message)
 	local band, bxor, bnot, rrotate, rshift = bit32.band, bit32.bxor, bit32.bnot, bit32.rrotate, bit32.rshift
 	local K = {
@@ -136,7 +146,7 @@ end
 function ServerReporter:Request(method, path, payload)
 	if not self.RequestFn then return false, nil, 0 end
 	local body = payload ~= nil and HttpService:JSONEncode(payload) or ""
-	local timestamp = tostring(os.time())
+	local timestamp = tostring(Now())
 	local headers = {
 		["X-API-ID"] = self.Id,
 		["X-Timestamp"] = timestamp,
@@ -312,7 +322,7 @@ function ServerReporter:ListServers(opts)
 		total = tonumber(data.total)
 		data = data.servers
 	end
-	local rows, now = {}, os.time()
+	local rows, now = {}, Now()
 	for _, entry in ipairs(data) do
 		if type(entry) == "table" and type(entry.job_id) == "string" and entry.job_id ~= "" then
 			local event = self.EventsByKey[entry.event_type]
